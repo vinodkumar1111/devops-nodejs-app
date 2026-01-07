@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+coverage
+.git
+.gitignore
+README.md
+.env
+.DS_Store
+tests
+*.test.js
+.vscode
+.idea
+Jenkinsfile
+sonar-project.properties
