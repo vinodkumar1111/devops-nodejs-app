@@ -78,14 +78,13 @@ pipeline {
                     sh '''
                         gitleaks detect --source . --verbose --no-git --report-path gitleaks-report.json || true
                         
-                        if [ -f gitleaks-report.json ]; then
-                            if [ -s gitleaks-report.json ]; then
-                                echo "⚠️  SECRETS DETECTED! Check gitleaks-report.json"
-                                cat gitleaks-report.json
-                                exit 1
-                            else
-                                echo "✅ No secrets detected"
-                            fi
+                        if [ -f gitleaks-report.json ] && [ "$(jq length gitleaks-report.json)" -gt 0 ]; then
+
+                          echo "⚠️  SECRETS DETECTED! Check gitleaks-report.json"
+                          cat gitleaks-report.json
+                          exit 1
+                        else
+                          echo "✅ No secrets detected"
                         fi
                     '''
                 }
@@ -127,7 +126,7 @@ pipeline {
                     echo '         STAGE 6: SONARQUBE QUALITY GATE        '
                     echo '================================================'
                 }
-                timeout(time: 10, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: false
                 }
             }
