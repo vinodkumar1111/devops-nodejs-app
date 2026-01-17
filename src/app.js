@@ -1,3 +1,4 @@
+const AWS_ACCESS_KEY_ID = 'ABCDEFGIJKLMNOPQRSTQUVWXYZ'
 const express = require('express');
 const app = express();
 
