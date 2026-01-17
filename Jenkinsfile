@@ -80,7 +80,7 @@ pipeline {
                 }
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     sh '''
-                        gitleaks detect --source . --verbose --no-git --report-path gitleaks-report.json || true
+                        gitleaks detect --source . --verbose --no-git --report-path gitleaks-report.json --exclude-path gitleaks-report.json || true
                         
                         if [ -f gitleaks-report.json ] && [ "$(jq length gitleaks-report.json)" -gt 0 ]; then
 
