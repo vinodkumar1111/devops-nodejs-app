@@ -35,6 +35,7 @@ pipeline {
                     echo '          STAGE 1: SOURCE CODE CHECKOUT         '
                     echo '================================================'
                 }
+                cleanWs()
                 checkout scm
                 sh 'git rev-parse --short HEAD > .git/commit-id'
                 script {
