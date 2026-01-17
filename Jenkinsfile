@@ -18,6 +18,10 @@ pipeline {
         // Paths
         WORKSPACE_PATH = "${WORKSPACE}"
     }
+    options{
+      // keep only last five builds
+      buildDiscarder(logRotator(numToKeepStr: '5'))
+    }
     
     tools {
         nodejs 'NodeJS-20'
