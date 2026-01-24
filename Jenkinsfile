@@ -98,15 +98,16 @@ pipeline {
             // Run SonarQube static code analysis
             steps {
                 script {
-                    def SonarScannerHome = tool 'SonarScanner'
-                    sh """
-                        ${SonarScannerHome}/bin/sonar-scanner \
-                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                        -Dsonar.sources=src \
-                        -Dsonar.tests=tests \
-                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                        -Dsonar.exclusions=node_modules/**,coverage/**/*.test/**
-                    """
+                    def scannerHome = tool 'SonarScanner'
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner \
+                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                            -Dsonar.sources=src \
+                            -Dsonar.tests=tests \
+                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                            -Dsonar.exclusions=node_modules/**,coverage/**,tests/**
+                        """
                 }
             }
         }
