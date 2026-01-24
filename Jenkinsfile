@@ -1,95 +1,55 @@
 pipeline {
     agent any
-    
     environment {
-        // Application
-        APP_NAME = 'devops-nodejs-app'
-        APP_PORT = '3000'
-        
-        // Docker
-        DOCKER_IMAGE = "${APP_NAME}"
-        DOCKER_TAG = "${BUILD_NUMBER}"
-        REGISTRY_URL = 'localhost:5000'
-        DOCKER_REGISTRY_IMAGE = "${REGISTRY_URL}/${DOCKER_IMAGE}"
-        
-        // SonarQube
-        SONAR_PROJECT_KEY = 'devops-nodejs-app'
-        
-        // Paths
-        WORKSPACE_PATH = "${WORKSPACE}"
+        APP_NAME                = 'node-js-app'
+        APP_PORT                = '3000'
+        DOCKER_IMAGE            = '${APP_NAME}'
+        DOCKER_TAG              = '${BUILD_NUMBER}'
+        REGISTRY_URL            = 'localhost:5000'
+        DOCKER_REGISTRY_PATH    = '${REGISTRY_URL}/${DOCKER_IMAGE}'
+        SONAR_PROJECT_KEY       = 'sonar-scanner'
+        WORKSPACE_PATH          = '${WORKSPACE}'
     }
-    options{
-      // keep only last five builds
-      buildDiscarder(logRotator(numToKeepStr: '5'))
-    }
-    
     tools {
-        nodejs 'NodeJS-20'
+        nodejs 'NodeJs-20'
     }
-    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '5'))
+    }
     stages {
-        stage('Checkout') {
+        stage('SCM Checkout') {
+            // Checkout source code and get short Git commit ID
             steps {
-                script {
-                    echo '================================================'
-                    echo '          STAGE 1: SOURCE CODE CHECKOUT         '
-                    echo '================================================'
-                }
-                cleanWs()
                 checkout scm
                 sh 'git rev-parse --short HEAD > .git/commit-id'
                 script {
                     env.GIT_COMMIT_SHORT = readFile('.git/commit-id').trim()
-                    echo "Git Commit: ${env.GIT_COMMIT_SHORT}"
+                    echo "Git commit ID: ${env.GIT_COMMIT_SHORT}"
                 }
             }
         }
-        
         stage('Environment Setup') {
+            // Display Node, NPM, Docker versions and workspace info
             steps {
-                script {
-                    echo '================================================'
-                    echo '       STAGE 2: ENVIRONMENT PREPARATION         '
-                    echo '================================================'
-                }
                 sh '''
-                    echo "Node version: $(node --version)"
-                    echo "NPM version: $(npm --version)"
-                    echo "Docker version: $(docker --version)"
-                    echo "Workspace: ${WORKSPACE}"
+                    echo "Node Version  : $(node --version)"
+                    echo "NPM Version   : $(npm --version)"
+                    echo "Docker Version: $(docker --version)"
+                    echo "Workspace     : $(WORKSPACE)"
                 '''
             }
         }
-        
-        stage('Install Dependencies') {
-            steps {
-                script {
-                    echo '================================================'
-                    echo '        STAGE 3: DEPENDENCY INSTALLATION        '
-                    echo '================================================'
-                }
-                sh 'npm ci'
-            }
-        }
-        
         stage('Secret Scanning') {
+            // Scan for secrets in the repo
             steps {
-                script {
-                    echo '================================================'
-                    echo '      STAGE 4: SECRET SCANNING (GITLEAKS)      '
-                    echo '================================================'
-                }
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     sh '''
                         gitleaks detect --source . --verbose --no-git --report-path gitleaks-report.json --exclude-path gitleaks-report.json || true
-                        
                         if [ -f gitleaks-report.json ] && [ "$(jq length gitleaks-report.json)" -gt 0 ]; then
-
-                          echo "⚠️  SECRETS DETECTED! Check gitleaks-report.json"
-                          cat gitleaks-report.json
-                          exit 1
+                            echo "Secrets detected!! Check gitleaks-report.json file"
+                            exit 1
                         else
-                          echo "✅ No secrets detected"
+                            echo "No Secrets Detected!!"
                         fi
                     '''
                 }
@@ -100,65 +60,22 @@ pipeline {
                 }
             }
         }
-        
-        stage('SonarQube Analysis') {
+        stage('Install Dependencies') {
+            // Install Node.js project dependencies
             steps {
-                script {
-                    echo '================================================'
-                    echo '      STAGE 5: CODE QUALITY ANALYSIS (SONAR)   '
-                    echo '================================================'
-                }
-                script {
-                    def scannerHome = tool 'SonarScanner'
-                    withSonarQubeEnv('SonarQube') {
-                        sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                            -Dsonar.sources=src \
-                            -Dsonar.tests=tests \
-                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.exclusions=node_modules/**,coverage/**,tests/**
-                        """
-                    }
-                }
+                sh 'npm ci'
             }
         }
-        
-        stage('Quality Gate') {
-            steps {
-                script {
-                    echo '================================================'
-                    echo '         STAGE 6: SONARQUBE QUALITY GATE        '
-                    echo '================================================'
-                }
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: false
-                }
-            }
-        }
-        
         stage('Dependency Security Check') {
+            // Check for high/critical vulnerabilities in dependencies
             steps {
-                script {
-                    echo '================================================'
-                    echo '      STAGE 7: DEPENDENCY VULNERABILITY SCAN    '
-                    echo '================================================'
-                }
-                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                    sh '''
-                        echo "Running npm audit..."
-                        npm audit --audit-level=moderate --json > npm-audit-report.json || true
-                        
-                        # Display report
-                        if [ -f npm-audit-report.json ]; then
-                            echo "Audit Report:"
-                            cat npm-audit-report.json | head -50
-                        fi
-                        
-                        # Check for high/critical vulnerabilities
-                        npm audit --audit-level=high || echo "⚠️  High/Critical vulnerabilities found"
-                    '''
-                }
+                sh '''
+                    npm audit --audit-level=HIGH --json > npm-audit-report.json || true
+                    if ! npm audit --audit-level=HIGH; then
+                        echo "High/Critical vulnerabilities found!"
+                        exit 1
+                    fi
+                '''
             }
             post {
                 always {
@@ -166,62 +83,64 @@ pipeline {
                 }
             }
         }
-        
-        stage('Run Tests') {
+        stage('Run Test') {
+            // Run unit tests with coverage
             steps {
-                script {
-                    echo '================================================'
-                    echo '          STAGE 8: UNIT TESTS & COVERAGE        '
-                    echo '================================================'
-                }
-                sh 'npm test -- --coverage'
+                sh 'npm test --coverage'
             }
             post {
                 always {
-                    // Archive test results
                     archiveArtifacts artifacts: 'coverage/**/*', allowEmptyArchive: true
                 }
             }
         }
-        
-        stage('Build Docker Image') {
+        stage('SonarQube Analysis') {
+            // Run SonarQube static code analysis
             steps {
                 script {
-                    echo '================================================'
-                    echo '         STAGE 9: DOCKER IMAGE BUILD            '
-                    echo '================================================'
+                    def SonarScannerHome = tool 'SonarScanner'
+                    sh '''
+                        ${SonarScannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=tests \
+                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.exclusions=node_modules/**,coverage/**/*.test/**
+                    '''
                 }
-                sh """
-                    docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY_IMAGE}:${DOCKER_TAG}
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY_IMAGE}:latest
-                    
-                    echo "✅ Docker image built: ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                """
             }
         }
-        
-        stage('Container Security Scan') {
+        stage('Quality Gate') {
+            // Wait for SonarQube quality gate results
             steps {
-                script {
-                    echo '================================================'
-                    echo '      STAGE 10: CONTAINER SECURITY SCAN (TRIVY) '
-                    echo '================================================'
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
                 }
-                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                    sh """
-                        echo "Scanning Docker image with Trivy..."
-                        
-                        # Scan for vulnerabilities
-                        trivy image --severity HIGH,CRITICAL --format json --output trivy-report.json ${DOCKER_IMAGE}:${DOCKER_TAG} || true
-                        
-                        # Display summary
-                        trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${DOCKER_TAG} || true
-                        
-                        echo "✅ Trivy scan completed"
-                    """
-                }
+            }
+        }
+        stage('Docker Image') {
+            // Build and tag Docker image
+            steps {
+                sh '''
+                    docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY_PATH}:latest
+                '''
+            }
+        }
+        stage('Docker Image Security Scan') {
+            // Scan Docker image for vulnerabilities using Trivy
+            steps {
+                sh '''
+                    trivy image \
+                        --severity HIGH,CRITICAL \
+                        --format json \
+                        --output trivy-report.json \
+                        --exit-code 1 \
+                        ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    echo "Trivy scan completed with no High/Critical vulnerabilities"
+                '''
             }
             post {
                 always {
@@ -229,104 +148,67 @@ pipeline {
                 }
             }
         }
-        
         stage('Push to Registry') {
+            // Push Docker image to registry
             steps {
-                script {
-                    echo '================================================'
-                    echo '       STAGE 11: PUSH TO DOCKER REGISTRY        '
-                    echo '================================================'
-                }
-                sh """
-                    docker push ${DOCKER_REGISTRY_IMAGE}:${DOCKER_TAG}
-                    docker push ${DOCKER_REGISTRY_IMAGE}:latest
-                    
-                    echo "✅ Image pushed to registry"
-                    echo "Image: ${DOCKER_REGISTRY_IMAGE}:${DOCKER_TAG}"
-                """
+                sh '''
+                    docker push ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}
+                    docker push ${DOCKER_REGISTRY_PATH}:latest
+                    echo "Image pushed to registry: ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}"
+                '''
             }
         }
-        
-        stage('Deploy Application') {
+        stage('Deploy Application in Container') {
+            // Deploy Docker container
             steps {
-                script {
-                    echo '================================================'
-                    echo '         STAGE 12: DEPLOY CONTAINER             '
-                    echo '================================================'
-                }
-                sh """
-                    # Stop and remove old container if exists
-                    docker stop ${APP_NAME} 2>/dev/null || true
-                    docker rm ${APP_NAME} 2>/dev/null || true
-                    
-                    # Run new container
+                sh '''
+                    docker rm -f ${APP_NAME} || true
+
                     docker run -d \
                         --name ${APP_NAME} \
                         --restart unless-stopped \
                         -p ${APP_PORT}:3000 \
                         -e NODE_ENV=production \
-                        ${DOCKER_REGISTRY_IMAGE}:${DOCKER_TAG}
-                    
-                    echo "✅ Container deployed successfully"
-                    echo "Container name: ${APP_NAME}"
+                        ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}
+                    echo "Container deployed successfully."
+                    echo "Container Name: ${APP_NAME}"
                     echo "Accessible at: http://localhost:${APP_PORT}"
-                    
-                    # Wait for container to start
                     sleep 5
-                    
-                    # Check container status
                     docker ps | grep ${APP_NAME}
-                """
+                '''
             }
         }
-        
         stage('Health Check') {
+            // Verify application endpoints are ready
             steps {
-                script {
-                    echo '================================================'
-                    echo '      STAGE 13: POST-DEPLOYMENT VERIFICATION    '
-                    echo '================================================'
-                }
                 retry(3) {
                     sh """
                         echo "Waiting for application to be ready..."
                         sleep 3
                         
-                        # Health check
                         curl -f http://localhost:${APP_PORT}/health || exit 1
-                        
-                        # Ready check
                         curl -f http://localhost:${APP_PORT}/ready || exit 1
-                        
-                        # Test main endpoint
                         curl -f http://localhost:${APP_PORT}/ || exit 1
                         
-                        echo "✅ All health checks passed!"
+                        echo "All health checks passed!"
                     """
                 }
             }
         }
-        
         stage('Smoke Tests') {
+            // Run basic API smoke tests
             steps {
-                script {
-                    echo '================================================'
-                    echo '           STAGE 14: SMOKE TESTS                '
-                    echo '================================================'
-                }
                 sh """
                     echo "Running smoke tests..."
                     
-                    # Test API endpoints
                     curl -s http://localhost:${APP_PORT}/api/info | grep -q "DevOps Node.js App"
                     curl -s http://localhost:${APP_PORT}/api/add/10/5 | grep -q '"result":15'
                     
-                    echo "✅ Smoke tests passed!"
+                    echo "Smoke tests passed!"
                 """
             }
         }
     }
-    
     post {
         always {
             script {
@@ -335,12 +217,11 @@ pipeline {
                 echo '================================================'
                 echo "Build Number: ${BUILD_NUMBER}"
                 echo "Git Commit: ${env.GIT_COMMIT_SHORT}"
-                echo "Docker Image: ${DOCKER_REGISTRY_IMAGE}:${DOCKER_TAG}"
+                echo "Docker Image: ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}"
                 echo "Application URL: http://localhost:${APP_PORT}"
                 echo '================================================'
             }
-            
-            // Cleanup
+
             cleanWs(
                 deleteDirs: true,
                 patterns: [
@@ -349,17 +230,18 @@ pipeline {
                 ]
             )
         }
-        
+
         success {
-            echo '✅ ✅ ✅ PIPELINE COMPLETED SUCCESSFULLY ✅ ✅ ✅'
+            echo 'PIPELINE COMPLETED SUCCESSFULLY...'
         }
-        
+
         failure {
-            echo '❌ ❌ ❌ PIPELINE FAILED ❌ ❌ ❌'
+            echo 'PIPELINE FAILED...'
         }
-        
+
         unstable {
-            echo '⚠️  ⚠️  ⚠️  PIPELINE UNSTABLE ⚠️  ⚠️  ⚠️'
+            echo 'PIPELINE UNSTABLE...'
         }
     }
 }
+
