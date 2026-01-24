@@ -123,18 +123,18 @@ pipeline {
         stage('Docker Image') {
             // Build and tag Docker image
             steps {
-                sh '''
+                sh """
                     docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
                     docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
                     docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}
                     docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY_PATH}:latest
-                '''
+                """
             }
         }
         stage('Docker Image Security Scan') {
             // Scan Docker image for vulnerabilities using Trivy
             steps {
-                sh '''
+                sh """
                     trivy image \
                         --severity HIGH,CRITICAL \
                         --format json \
@@ -142,7 +142,7 @@ pipeline {
                         --exit-code 1 \
                         ${DOCKER_IMAGE}:${DOCKER_TAG}
                     echo "Trivy scan completed with no High/Critical vulnerabilities"
-                '''
+                """
             }
             post {
                 always {
@@ -153,17 +153,17 @@ pipeline {
         stage('Push to Registry') {
             // Push Docker image to registry
             steps {
-                sh '''
+                sh """
                     docker push ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}
                     docker push ${DOCKER_REGISTRY_PATH}:latest
                     echo "Image pushed to registry: ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}"
-                '''
+                """
             }
         }
         stage('Deploy Application in Container') {
             // Deploy Docker container
             steps {
-                sh '''
+                sh """
                     docker rm -f ${APP_NAME} || true
 
                     docker run -d \
@@ -177,7 +177,7 @@ pipeline {
                     echo "Accessible at: http://localhost:${APP_PORT}"
                     sleep 5
                     docker ps | grep ${APP_NAME}
-                '''
+                """
             }
         }
         stage('Health Check') {
