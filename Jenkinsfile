@@ -3,10 +3,10 @@ pipeline {
     environment {
         APP_NAME                = 'node-js-app'
         APP_PORT                = '3000'
-        DOCKER_IMAGE            = '${APP_NAME}'
-        DOCKER_TAG              = '${BUILD_NUMBER}'
+        DOCKER_IMAGE            = "${APP_NAME}"
+        DOCKER_TAG              = "${BUILD_NUMBER}"
         REGISTRY_URL            = 'localhost:5000'
-        DOCKER_REGISTRY_PATH    = '${REGISTRY_URL}/${DOCKER_IMAGE}'
+        DOCKER_REGISTRY_PATH    = "${REGISTRY_URL}/${DOCKER_IMAGE}"
         SONAR_PROJECT_KEY       = 'sonar-scanner'
         WORKSPACE_PATH          = '${WORKSPACE}'
     }
