@@ -108,6 +108,7 @@ pipeline {
                             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                             -Dsonar.exclusions=node_modules/**,coverage/**,tests/**
                         """
+                     }   
                 }
             }
         }
