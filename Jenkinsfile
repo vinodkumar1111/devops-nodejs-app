@@ -11,7 +11,7 @@ pipeline {
         WORKSPACE_PATH          = '${WORKSPACE}'
     }
     tools {
-        nodejs 'NodeJs-20'
+        nodejs 'NodeJS-20'
     }
     options {
         buildDiscarder(logRotator(numToKeepStr: '5'))
