@@ -99,14 +99,14 @@ pipeline {
             steps {
                 script {
                     def SonarScannerHome = tool 'SonarScanner'
-                    sh '''
+                    sh """
                         ${SonarScannerHome}/bin/sonar-scanner \
                         -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                         -Dsonar.sources=src \
                         -Dsonar.tests=tests \
                         -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                         -Dsonar.exclusions=node_modules/**,coverage/**/*.test/**
-                    '''
+                    """
                 }
             }
         }
