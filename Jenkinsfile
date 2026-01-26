@@ -170,7 +170,7 @@ pipeline {
             // Deploy Docker container
             steps {
                 sh """
-                    docker rm -f ${APP_NAME} || true
+                    docker ps -q --filter publish=3000 | xargs -r docker rm -f
 
                     docker run -d \
                         --name ${APP_NAME} \
