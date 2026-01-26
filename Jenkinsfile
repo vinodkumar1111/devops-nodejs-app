@@ -170,7 +170,8 @@ pipeline {
             // Deploy Docker container
             steps {
                 sh """
-                    docker ps -q --filter publish=3000 | xargs -r docker rm -f
+                    # Remove any container with same name, running or stopped
+                    docker ps -a --filter "name=${APP_NAME}" -q | xargs -r docker rm -f
 
                     docker run -d \
                         --name ${APP_NAME} \
