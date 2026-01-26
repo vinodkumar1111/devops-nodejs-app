@@ -1,12 +1,11 @@
 pipeline {
     agent any
     environment {
-        APP_NAME                = 'node-js-app'
+        APP_NAME                = 'nodejs-app'
         APP_PORT                = '3000'
-        DOCKER_IMAGE            = "${APP_NAME}"
+        DOCKER_HUB_USER         = 'vramavath'
+        DOCKER_IMAGE            = "${DOCKER_HUB_USER}/${APP_NAME}"
         DOCKER_TAG              = "${BUILD_NUMBER}"
-        REGISTRY_URL            = 'localhost:5000'
-        DOCKER_REGISTRY_PATH    = "${REGISTRY_URL}/${DOCKER_IMAGE}"
         SONAR_PROJECT_KEY       = 'sonar-scanner'
         WORKSPACE_PATH          = '${WORKSPACE}'
     }
@@ -126,8 +125,6 @@ pipeline {
                 sh """
                     docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
                     docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY_PATH}:latest
                 """
             }
         }
@@ -154,11 +151,19 @@ pipeline {
         stage('Push to Registry') {
             // Push Docker image to registry
             steps {
-                sh """
-                    docker push ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}
-                    docker push ${DOCKER_REGISTRY_PATH}:latest
-                    echo "Image pushed to registry: ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}"
-                """
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_TOKEN'
+                )]) {
+                    sh """
+                        echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker push ${DOCKER_IMAGE}:latest
+                        docker logout
+                        echo "Image pushed to docker hub: ${DOCKER_IMAGE}:${DOCKER_TAG} and ${DOCKER_IMAGE}:latest"
+                    """
+                }
             }
         }
         stage('Deploy Application in Container') {
@@ -172,7 +177,7 @@ pipeline {
                         --restart unless-stopped \
                         -p ${APP_PORT}:3000 \
                         -e NODE_ENV=production \
-                        ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}
+                        ${DOCKER_IMAGE}:${DOCKER_TAG}
                     echo "Container deployed successfully."
                     echo "Container Name: ${APP_NAME}"
                     echo "Accessible at: http://localhost:${APP_PORT}"
@@ -220,7 +225,7 @@ pipeline {
                 echo '================================================'
                 echo "Build Number: ${BUILD_NUMBER}"
                 echo "Git Commit: ${env.GIT_COMMIT_SHORT}"
-                echo "Docker Image: ${DOCKER_REGISTRY_PATH}:${DOCKER_TAG}"
+                echo "Docker Image: ${DOCKER_IMAGE}:${DOCKER_TAG}"
                 echo "Application URL: http://localhost:${APP_PORT}"
                 echo '================================================'
             }
