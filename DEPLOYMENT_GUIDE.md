@@ -43,14 +43,6 @@ A fully automated CI/CD pipeline with:
 - ✅ Containerized deployment
 - ✅ Health monitoring
 
-### Timeline
-
-- **Infrastructure Setup:** 2-3 hours
-- **Application Setup:** 30 minutes
-- **Pipeline Configuration:** 1 hour
-- **Testing & Verification:** 30 minutes
-- **Total:** ~4-5 hours
-
 ---
 
 ## Architecture
@@ -1542,19 +1534,9 @@ sudo systemctl restart docker
 
 ---
 
-### H. Support and Contact
-
-For issues or questions:
-- **GitHub Issues:** [Your repo URL]/issues
-- **Team Slack:** #devops-team
-- **Email:** devops@yourcompany.com
-
----
-
 **Document Version:** 1.0  
 **Last Updated:** January 2026  
-**Maintained by:** DevOps Team  
-**Review Schedule:** Quarterly
+**Maintained by:** vinod 
 
 ---
 
